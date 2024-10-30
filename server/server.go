@@ -1,4 +1,4 @@
-package myRPC
+package server
 
 import (
 	"encoding/json"

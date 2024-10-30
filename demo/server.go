@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"myRPC"
 	"myRPC/codec"
+	"myRPC/server"
 	"net"
 	"time"
 )
@@ -18,20 +18,20 @@ func startServer(addr chan string) {
 	}
 	log.Println("start rpc server on", l.Addr())
 	addr <- l.Addr().String()
-	myRPC.Accept(l)
+	server.Accept(l)
 }
 
 func main() {
 	addr := make(chan string)
 	go startServer(addr)
 
-	// in fact, following code is like a simple geerpc client
+	// in fact, following code is like a simple rpc client
 	conn, _ := net.Dial("tcp", <-addr)
 	defer func() { _ = conn.Close() }()
 
 	time.Sleep(time.Second)
 	// send options
-	_ = json.NewEncoder(conn).Encode(myRPC.DefaultOption)
+	_ = json.NewEncoder(conn).Encode(server.DefaultOption)
 	cc := codec.NewGobCodec(conn)
 	// send request & receive response
 	for i := 0; i < 5; i++ {
