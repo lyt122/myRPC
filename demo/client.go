@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"myRPC/client"
@@ -23,6 +24,7 @@ func startServer(addr chan string) {
 
 func main() {
 	log.SetFlags(0)
+	ctx, _ := context.WithTimeout(context.Background(), time.Second)
 	addr := make(chan string)
 	go startServer(addr)
 	client, _ := client.Dial("tcp", <-addr)
@@ -37,7 +39,7 @@ func main() {
 			defer wg.Done()
 			args := fmt.Sprintf("rpc req %d", i)
 			var reply string
-			if err := client.Call("Foo.Sum", args, &reply); err != nil {
+			if err := client.Call(ctx, "Foo.Sum", args, &reply); err != nil {
 				log.Fatal("call Foo.Sum error:", err)
 			}
 			log.Println("reply:", reply)
