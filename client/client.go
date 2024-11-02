@@ -170,25 +170,6 @@ func parseOptions(opts ...*server.Option) (*server.Option, error) {
 	return opt, nil
 }
 
-// Dial connects to an RPC server at the specified network address
-func Dial(network, address string, opts ...*server.Option) (client *Client, err error) {
-	opt, err := parseOptions(opts...)
-	if err != nil {
-		return nil, err
-	}
-	conn, err := net.Dial(network, address)
-	if err != nil {
-		return nil, err
-	}
-	// close the connection if client is nil
-	defer func() {
-		if client == nil {
-			_ = conn.Close()
-		}
-	}()
-	return NewClient(conn, opt)
-}
-
 func (client *Client) send(call *Call) {
 	// make sure that the client will send a complete request
 	client.sending.Lock()
@@ -257,7 +238,7 @@ type clientResult struct {
 
 type newClientFunc func(conn net.Conn, opt *server.Option) (client *Client, err error)
 
-func dialTimeout(f newClientFunc, network, address string, opts ...*server.Option) (client *Client, err error) {
+func DialTimeout(f newClientFunc, network, address string, opts ...*server.Option) (client *Client, err error) {
 	opt, err := parseOptions(opts...)
 	if err != nil {
 		return nil, err
@@ -289,6 +270,6 @@ func dialTimeout(f newClientFunc, network, address string, opts ...*server.Optio
 	}
 }
 
-func DialTimeout(network, address string, opts ...*server.Option) (*Client, error) {
-	return dialTimeout(NewClient, network, address, opts...)
+func Dial(network, address string, opts ...*server.Option) (*Client, error) {
+	return DialTimeout(NewClient, network, address, opts...)
 }
