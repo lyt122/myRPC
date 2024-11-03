@@ -33,7 +33,7 @@ func DialHTTP(network, address string, opts ...*server.Option) (*Client, error) 
 	return DialTimeout(NewHTTPClient, network, address, opts...)
 }
 
-// XDial calls different functions to connect to a RPC server
+// XDial calls different functions to connect to an RPC server
 // according the first parameter rpcAddr.
 // rpcAddr is a general format (protocol@addr) to represent a rpc server
 // eg, http@10.0.0.1:7001, tcp@10.0.0.1:9999, unix@/tmp/myRPC.sock
