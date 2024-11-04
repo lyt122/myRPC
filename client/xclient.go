@@ -3,14 +3,18 @@ package client
 import (
 	"context"
 	"io"
+	"log"
 	"myRPC/server"
+	"net/http"
 	"reflect"
+	"strings"
 	"sync"
+	"time"
 )
 
 type XClient struct {
-	d       server.Discovery
-	mode    server.SelectMode
+	d       Discovery
+	mode    SelectMode
 	opt     *server.Option
 	mu      sync.Mutex // protect following
 	clients map[string]*Client
@@ -18,7 +22,7 @@ type XClient struct {
 
 var _ io.Closer = (*XClient)(nil)
 
-func NewXClient(d server.Discovery, mode server.SelectMode, opt *server.Option) *XClient {
+func NewXClient(d Discovery, mode SelectMode, opt *server.Option) *XClient {
 	return &XClient{d: d, mode: mode, opt: opt, clients: make(map[string]*Client)}
 }
 
@@ -107,4 +111,70 @@ func (xc *XClient) Broadcast(ctx context.Context, serviceMethod string, args, re
 	}
 	wg.Wait()
 	return e
+}
+
+type RegistryDiscovery struct {
+	*MultiServersDiscovery
+	registry   string
+	timeout    time.Duration
+	lastUpdate time.Time
+}
+
+const defaultUpdateTimeout = time.Second * 10
+
+func NewRegistryDiscovery(registerAddr string, timeout time.Duration) *RegistryDiscovery {
+	if timeout == 0 {
+		timeout = defaultUpdateTimeout
+	}
+	d := &RegistryDiscovery{
+		MultiServersDiscovery: NewMultiServerDiscovery(make([]string, 0)),
+		registry:              registerAddr,
+		timeout:               timeout,
+	}
+	return d
+}
+
+func (d *RegistryDiscovery) Update(servers []string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.servers = servers
+	d.lastUpdate = time.Now()
+	return nil
+}
+
+func (d *RegistryDiscovery) Refresh() error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.lastUpdate.Add(d.timeout).After(time.Now()) {
+		return nil
+	}
+	log.Println("rpc registry: refresh servers from registry", d.registry)
+	resp, err := http.Get(d.registry)
+	if err != nil {
+		log.Println("rpc registry refresh err:", err)
+		return err
+	}
+	servers := strings.Split(resp.Header.Get("X-myrpc-Servers"), ",")
+	d.servers = make([]string, 0, len(servers))
+	for _, s := range servers {
+		if strings.TrimSpace(s) != "" {
+			d.servers = append(d.servers, strings.TrimSpace(s))
+		}
+	}
+	d.lastUpdate = time.Now()
+	return nil
+}
+
+func (d *RegistryDiscovery) Get(mode SelectMode) (string, error) {
+	if err := d.Refresh(); err != nil {
+		return "", err
+	}
+	return d.MultiServersDiscovery.Get(mode)
+}
+
+func (d *RegistryDiscovery) GetAll() ([]string, error) {
+	if err := d.Refresh(); err != nil {
+		return nil, err
+	}
+	return d.MultiServersDiscovery.GetAll()
 }
